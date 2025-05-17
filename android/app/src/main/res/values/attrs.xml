@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="SplashScreen">
+        <attr name="windowSplashScreenBackground" format="reference|color" />
+        <attr name="windowSplashScreenAnimatedIcon" format="reference" />
+        <attr name="windowSplashScreenIconBackgroundColor" format="reference|color" />
+        <attr name="windowSplashScreenAnimationDuration" format="integer" />
+        <attr name="postSplashScreenTheme" format="reference" />
+    </declare-styleable>
+</resources>

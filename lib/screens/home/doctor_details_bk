@@ -1,0 +1,345 @@
+import 'dart:convert';
+
+import 'package:doctor_app/constants.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_zoom_videosdk/native/zoom_videosdk.dart';
+import 'package:doctor_app/models/appointmentModel.dart';
+import 'package:doctor_app/styles/colors.dart';
+import 'package:doctor_app/styles/styles.dart';
+import 'package:flutter_zoom_videosdk/native/zoom_videosdk_event_listener.dart';
+import 'package:flutter_zoom_videosdk/native/zoom_videosdk_user.dart';
+
+class SliverDoctorDetail extends StatelessWidget {
+  final AppointmentModel appointmentModel;
+
+  SliverDoctorDetail({Key? key, required this.appointmentModel}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            title: Text('Appointment details'),
+            backgroundColor: primaryColor,
+            expandedHeight: 200,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Image(
+                image: AssetImage('assets/images/hospital.jpeg'),
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: DetailBody(appointmentModel: appointmentModel),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class DetailBody extends StatefulWidget {
+  final AppointmentModel appointmentModel;
+
+  DetailBody({Key? key, required this.appointmentModel}) : super(key: key);
+
+  @override
+  _DetailBodyState createState() => _DetailBodyState();
+}
+
+class _DetailBodyState extends State<DetailBody> {
+
+  var zoom = ZoomVideoSdk();
+  var eventListener = ZoomVideoSdkEventListener();
+
+
+  // Zoom SDK initialization
+  Future<void> initializeZoomSdk() async {
+    try {
+      InitConfig initConfig = InitConfig(
+        domain: "zoom.us",
+        enableLog: true,
+      );
+      await zoom.initSdk(initConfig);
+      print("✅ Zoom SDK initialized successfully");
+    } catch (e) {
+      print("❌ Error initializing Zoom SDK: $e");
+    }
+  }
+
+  Map<String, bool> SDKaudioOptions = {
+    "connect": true,
+    "mute": true,
+  };
+
+  Map<String, bool> SDKvideoOptions = {
+    "localVideoOn": true,
+  };
+
+
+
+
+  @override
+  void initState() {
+    super.initState();
+    initializeZoomSdk();
+    EventEmitter emitter = eventListener.eventEmitter;
+
+// Register the event listener for session join
+    final sessionJoinListener = eventListener.addListener(EventType.onSessionJoin, (data) async {
+      try {
+        // Ensure data is a Map with the correct format
+        Map<String, dynamic> eventData = data as Map<String, dynamic>;
+
+        // // Update session state
+        // isInSession.value = true;
+        //
+        // // Get session details (name and password)
+        // String? sessionNameValue = await zoom.session.getSessionName();
+        // sessionName.value = sessionNameValue ?? "";
+        //
+        // sessionPassword.value = await zoom.session.getSessionPassword() ?? "";
+
+        // Handle user information
+        ZoomVideoSdkUser mySelf = ZoomVideoSdkUser.fromJson(jsonDecode(eventData['sessionUser']));
+
+        // Fetch remote users
+        List<ZoomVideoSdkUser>? remoteUsers = await zoom.session.getRemoteUsers();
+
+        // Get audio/video status of the current user
+        bool? muted = await mySelf.audioStatus?.isMuted();
+        bool? videoOn = await mySelf.videoStatus?.isOn();
+        bool? speakerOn = await zoom.audioHelper.getSpeakerStatus();
+
+        // // Update UI states accordingly
+        // fullScreenUser.value = mySelf;
+        // remoteUsers?.insert(0, mySelf);
+        // users.value = remoteUsers!;
+        // isMuted.value = muted ?? false;
+        // isSpeakerOn.value = speakerOn ?? false;
+        // isVideoOn.value = videoOn ?? false;
+        //
+        // // Ensure to update the users list
+        // users.value = remoteUsers;
+      } catch (e) {
+        print("Error in onSessionJoin listener: $e");
+      }
+    });
+
+  }
+
+  // Join Zoom session
+  Future<void> joinZoomSession() async {
+    JoinSessionConfig joinSession = JoinSessionConfig(
+      sessionName: "telemedicine",
+      sessionPassword: "JJJcQXnoNHXl0QxwMUMhsqdSACWwIS.1", // Ensure this is the correct password
+      token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcHBfa2V5IjoiQTdobThWdndrbzlDU0ZMZUNENFQ3TGIwSWFFWjRhNUdOdlZwIiwicm9sZV90eXBlIjowLCJ0cGMiOiJ0ZWxlbWVkaWNpbmUiLCJpYXQiOjE3MzgxNDY1MDUsImV4cCI6MTczODE1MDEwNX0.z0ALNKhvxh-WozNXcWcERhbTVWr4cmfuzoOTHagwQkI", // Replace with your actual JWT token
+      userName: "telemedicine",
+      audioOptions: SDKaudioOptions,
+      videoOptions: SDKvideoOptions,
+      sessionIdleTimeoutMins: 30,
+    );
+
+    try {
+      zoom.joinSession(joinSession).then((value){
+      }).onError((error, stackTrace){
+        print(error.toString());
+
+      });
+      print("✅ Successfully joined session");
+    } catch (e) {
+      print("❌ Error joining session: $e");
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(20),
+      margin: EdgeInsets.only(bottom: 30),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          DetailDoctorCard(appointmentModel: widget.appointmentModel),
+          SizedBox(height: 15),
+          DoctorInfo(appointmentModel: widget.appointmentModel),
+          SizedBox(height: 30),
+          Text(
+            'Description',
+            style: kTitleStyle,
+          ),
+          SizedBox(height: 15),
+          Text(
+            '${widget.appointmentModel.desciption}',
+            style: TextStyle(
+              color: Color(MyColors.purple01),
+              fontWeight: FontWeight.w500,
+              height: 1.5,
+            ),
+          ),
+          SizedBox(height: 30),
+          Text(
+            'Appointment Type',
+            style: kTitleStyle,
+          ),
+          SizedBox(height: 15),
+          Text(
+            '${widget.appointmentModel.appointment_type}',
+            style: TextStyle(
+              color: Color(MyColors.purple01),
+              fontWeight: FontWeight.w500,
+              height: 1.5,
+            ),
+          ),
+          SizedBox(height: 25),
+          // Button to Start Zoom Meeting
+          Visibility(
+            visible: widget.appointmentModel.appointment_type.toLowerCase() == "telemedicine",
+            child: ElevatedButton(
+              style: ButtonStyle(
+                backgroundColor: MaterialStateProperty.all<Color>(
+                  Color(MyColors.primary),
+                ),
+              ),
+              child: Text('Start appointment'),
+              onPressed: () async {
+                print("🔍 Joining Zoom session...");
+                await joinZoomSession();
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class DoctorInfo extends StatelessWidget {
+  final AppointmentModel appointmentModel;
+
+  DoctorInfo({
+    Key? key, required this.appointmentModel,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        NumberCard(
+          label: 'Time',
+          value: '${appointmentModel.appointment_time.length > 8 ? appointmentModel.appointment_time.substring(0, 8) : appointmentModel.appointment_time}',
+        ),
+        SizedBox(width: 15),
+        NumberCard(
+          label: 'Date',
+          value: '${appointmentModel.appointment_date.length > 10 ? appointmentModel.appointment_date.substring(0, 10) : appointmentModel.appointment_date}',
+        ),
+      ],
+    );
+  }
+}
+
+class NumberCard extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const NumberCard({
+    Key? key,
+    required this.label,
+    required this.value,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(15),
+          color: Color(MyColors.bg03),
+        ),
+        padding: EdgeInsets.symmetric(
+          vertical: 30,
+          horizontal: 15,
+        ),
+        child: Column(
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: Color(MyColors.grey02),
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            SizedBox(
+              height: 10,
+            ),
+            Text(
+              value,
+              style: TextStyle(
+                color: Color(MyColors.header01),
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class DetailDoctorCard extends StatelessWidget {
+  final AppointmentModel appointmentModel;
+
+  DetailDoctorCard({
+    Key? key, required this.appointmentModel
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      child: Card(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        child: Container(
+          padding: EdgeInsets.all(15),
+          width: double.infinity,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${appointmentModel.doctor_name}',
+                      style: TextStyle(
+                          color: Color(MyColors.header01),
+                          fontWeight: FontWeight.w700),
+                    ),
+                    SizedBox(
+                      height: 10,
+                    ),
+                    Text(
+                      '${appointmentModel.clinic_name}',
+                      style: TextStyle(
+                        color: Color(MyColors.grey02),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Image(
+                image: AssetImage('assets/images/doctor01.jpeg'),
+                width: 100,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
